@@ -32,3 +32,4 @@ while True:
         "role": "assistant",
         "content": assistant_message
     })
+    
