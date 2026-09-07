@@ -1,7 +1,7 @@
 [project]
 name = "generative-ai-learning"
 version = "0.1.0"
-description = "Add your description here"
+description = "this project is for learning basic RAG"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -11,6 +11,7 @@ dependencies = [
     "langchain-core>=1.6.1",
     "langchain-groq>=1.1.3",
     "langchain-ollama>=1.1.0",
+    "langfuse>=4.15.1",
     "ollama>=0.6.2",
     "pymupdf>=1.28.2",
     "pypdf>=6.16.2",
