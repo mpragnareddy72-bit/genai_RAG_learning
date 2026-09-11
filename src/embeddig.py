@@ -1,3 +1,4 @@
+import hashlib
 from typing import List, Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import logging
@@ -53,6 +54,16 @@ class EmbeddingPipeline:
             separators=["\n\n", "\n", " ", ""]
         )
         chunks = splitter.split_documents(documents)
+
+        for chunk in chunks:
+            chunk_id = hashlib.sha256(
+                chunk.page_content.encode("utf-8")
+            ).hexdigest()
+
+            chunk.metadata["chunk_id"] = chunk_id
+        logger.info("[INFO] Chunk id's generated successfully for %d chunks", len(chunks))
+
+    
         chunk_lengths = [len(chunk.page_content)for chunk in chunks]
         print(f"[INFO] Split {len(documents)} documents into {len(chunks)} chunks.")
         logger.info( "[INFO] Document chunking completed | " "Documents: %d | Chunks: %d | ""Chunk size: %d | Overlap: %d",
@@ -65,20 +76,20 @@ class EmbeddingPipeline:
                 sum(chunk_lengths) / len(chunk_lengths)
             )
 
-        # Add information to the current Langfuse observation
-        langfuse.update_current_span(
-            input={
-                "documents": len(documents),
-                "chunk_size": self.chunk_size,
-                "chunk_overlap": self.chunk_overlap
-            },
-            output={
-                "chunks": len(chunks),
-                "min_chunk_length": min(chunk_lengths),
-                "max_chunk_length": max(chunk_lengths),
-                "average_chunk_length": sum(chunk_lengths) / len(chunk_lengths)
-            }
-        )
+            # Add information to the current Langfuse observation
+            langfuse.update_current_span(
+                input={
+                    "documents": len(documents),
+                    "chunk_size": self.chunk_size,
+                    "chunk_overlap": self.chunk_overlap
+                },
+                output={
+                    "chunks": len(chunks),
+                    "min_chunk_length": min(chunk_lengths),
+                    "max_chunk_length": max(chunk_lengths),
+                    "average_chunk_length": sum(chunk_lengths) / len(chunk_lengths)
+                }
+            )
         return chunks
     
 # --------------------------------------------------
@@ -149,7 +160,7 @@ if __name__ == "__main__":
         embeddings = emb_pipe.embed_chunks(chunks)
 
         logger.info("[INFO] PIPELINE COMPLETED | Total Chunks: %d | Embeddings shape: %s",len(chunks),embeddings.shape)
-        logger.info("[INFO] Example embedding: %s", embeddings[0] if len(embeddings) > 0 else None)
+        #logger.info("[INFO] Example embedding: %s", embeddings[0] if len(embeddings) > 0 else None)
 
     except Exception:
         logger.exception(
