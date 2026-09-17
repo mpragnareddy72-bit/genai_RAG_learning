@@ -5,7 +5,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 import logging
 from langfuse import observe, get_client
 
-from sentence_transformers import SentenceTransformer
+#from sentence_transformers import SentenceTransformer
+from langchain_ollama import OllamaEmbeddings
 import numpy as np
 try:
     from .data_loader import load_all_documents
@@ -33,12 +34,12 @@ langfuse = get_client()
 
 
 class EmbeddingPipeline:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", chunk_size: int = 1000, chunk_overlap: int = 200):
+    def __init__(self, model_name: str = "nomic-embed-text", chunk_size: int = 1000, chunk_overlap: int = 200): # model_name: str = "all-MiniLM-L6-v2"
         self.model_name = model_name
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         logger.info( "Loading embedding model: %s",model_name)
-        self.model = SentenceTransformer(model_name)
+        self.model = OllamaEmbeddings(model=model_name)
         logger.info(f"[INFO] Loaded embedding model: {model_name}")
       
 
@@ -120,8 +121,10 @@ class EmbeddingPipeline:
         logger.info("Generating embeddings | Model: %s",self.model_name)
 
         # 3. Generate embeddings using the SentenceTransformer model
-        embeddings = self.model.encode(texts, show_progress_bar=True)
-
+        #embeddings = self.model.encode(texts, show_progress_bar=True)
+        embeddings = self.model.embed_documents(texts)
+        embeddings = np.array(embeddings, dtype="float32")
+        
         # 4. Get embedding information
         embedding_shape = embeddings.shape
         embedding_dimension = embeddings.shape[1]

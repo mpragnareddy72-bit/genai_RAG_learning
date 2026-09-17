@@ -6,7 +6,8 @@ from typing import List, Any, Optional, Set
 import numpy as np
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
-from sentence_transformers import SentenceTransformer
+#from sentence_transformers import SentenceTransformer
+from langchain_ollama import OllamaEmbeddings
 
 from langfuse import observe, get_client
 
@@ -48,7 +49,7 @@ class QdrantVectorStore:
         self,
         collection_name: str = "documents",
         persist_dir: str = "qdrant_store",
-        embedding_model: str = "all-MiniLM-L6-v2",
+        embedding_model: str = "nomic-embed-text",
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         url: Optional[str] = None,
@@ -60,8 +61,11 @@ class QdrantVectorStore:
         self.chunk_overlap = chunk_overlap
 
         logger.info("Loading embedding model: %s", embedding_model)
-        self.model = SentenceTransformer(embedding_model)
-        self.embedding_dim = self.model.get_embedding_dimension()
+        self.model = OllamaEmbeddings(model=embedding_model)
+        #self.embedding_dim = self.model.get_embedding_dimension()
+        # Get embedding dimension from the actual model
+        test_embedding = self.model.embed_query("test")
+        self.embedding_dim = len(test_embedding)
         logger.info("[INFO] Loaded embedding model: %s (dim=%d)", embedding_model, self.embedding_dim)
 
         if url:
@@ -221,6 +225,43 @@ class QdrantVectorStore:
             output={"upserted": len(points), "skipped_duplicates": skipped},
         )
 
+    def get_all_documents(self):
+        """
+        Retrieve all stored chunks from Qdrant.
+        Used to build the BM25 keyword index.
+        """
+        points = []
+        offset = None
+
+        while True:
+            batch, offset = self.client.scroll(
+                collection_name=self.collection_name,
+                limit=100,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+
+            points.extend(batch)
+
+            if offset is None:
+                break
+
+        documents = []
+
+        for point in points:
+            documents.append({
+                "id": str(point.id),
+                "metadata": point.payload or {}
+            })
+
+        logger.info(
+            "[INFO] Retrieved all documents from Qdrant | count=%d",
+            len(documents)
+        )
+
+        return documents
+
     # --------------------------------------------------
     # Search(retrieve step in rag) and query helpers
     # --------------------------------------------------
@@ -246,7 +287,7 @@ class QdrantVectorStore:
     @observe(name="query")
     def query(self, query_text: str, top_k: int = 5):
         logger.info("[INFO] Querying vector store for: '%s'", query_text)
-        query_emb = self.model.encode([query_text]).astype("float32")
+        query_emb = np.array([self.model.embed_query(query_text)], dtype="float32")
         return self.search(query_emb, top_k=top_k)
 
 
