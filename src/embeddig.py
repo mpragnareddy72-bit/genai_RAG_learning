@@ -1,3 +1,4 @@
+
 import hashlib
 from typing import List, Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -6,7 +7,11 @@ from langfuse import observe, get_client
 
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from data_loader import load_all_documents
+try:
+    from .data_loader import load_all_documents
+except ImportError:
+    from data_loader import load_all_documents
+
 
 # --------------------------------------------------
 # Python Logger

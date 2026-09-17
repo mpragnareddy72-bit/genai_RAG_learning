@@ -10,7 +10,10 @@ from sentence_transformers import SentenceTransformer
 
 from langfuse import observe, get_client
 
-from embeddig import EmbeddingPipeline  # your existing chunk/embed pipeline
+try:
+    from .embeddig import EmbeddingPipeline 
+except ImportError:
+    from embeddig import EmbeddingPipeline 
 
 # --------------------------------------------------
 # Python Logger
@@ -224,19 +227,20 @@ class QdrantVectorStore:
     @observe(name="search")
     def search(self, query_embedding: np.ndarray, top_k: int = 5):
         logger.info("Searching collection '%s' | top_k=%d", self.collection_name, top_k)
-        results = self.client.search(
+        results = self.client.query_points(
             collection_name=self.collection_name,
-            query_vector=query_embedding[0].tolist(),
+            query=query_embedding[0].tolist(),
             limit=top_k,
         )
-        logger.info("[INFO] Search returned %d results", len(results))
+        points = results.points
+        logger.info("[INFO] Search returned %d results", len(points))
         langfuse.update_current_span(
             input={"top_k": top_k},
-            output={"results_returned": len(results)},
+            output={"results_returned": len(points)},
         )
         return [
             {"id": r.id, "score": r.score, "metadata": r.payload}
-            for r in results
+            for r in points
         ]
 
     @observe(name="query")
