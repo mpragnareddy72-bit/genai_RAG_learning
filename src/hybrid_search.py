@@ -5,6 +5,9 @@ try:
 except ImportError:
     from vectorstores import QdrantVectorStore
 
+
+from rrf import ReciprocalRankFusion
+
 logger = logging.getLogger(__name__)
 
 
@@ -81,8 +84,48 @@ if __name__ == "__main__":
 
     # Create BM25 index
     bm25_search = BM25Search(documents)
+    # --------------------------------------------------
+    # Hybrid search using RRF
+    # --------------------------------------------------
 
     query = "What is population of afganistan"
+
+    # Semantic search
+    nomic_results = vectorstore.query(
+        query,
+        top_k=10
+    )
+
+    # Keyword search
+    bm25_results = bm25_search.search(
+        query,
+        top_k=10
+    )
+
+    # RRF
+    rrf = ReciprocalRankFusion(k=60)
+
+    rrf_results = rrf.fuse(
+        [nomic_results, bm25_results],
+        top_k=5
+    )
+
+    print(f"\nRRF Hybrid results for: {query}\n")
+
+    for i, result in enumerate(rrf_results, start=1):
+
+        print(f"Result {i}")
+        print(f"RRF Score: {result['score']}")
+
+        text = result["metadata"].get("text", "")
+
+        if "afghanistan" in text.lower():
+            print("AFGHANISTAN CHUNK")
+
+        print(text[:500])
+        print("-" * 80)
+
+    '''query = "What is population of afganistan"
 
     # --------------------------------------------------
     # Check whether Afghanistan exists in Qdrant
@@ -130,4 +173,4 @@ if __name__ == "__main__":
         print(f"Result {i}")
         print(f"Score: {result['score']}")
         print(f"Text: {result['metadata'].get('text', '')[:500]}")
-        print("-" * 80)
+        print("-" * 80)'''
