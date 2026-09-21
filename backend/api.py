@@ -34,7 +34,7 @@ rag_search = None
 def load_rag_pipeline():
     global rag_search
     logger.info("[INFO] Loading RAG pipeline at startup")
-    rag_search = RAGSearch(llm_model="llama3")
+    rag_search = RAGSearch(llm_model="llama3.2")
     logger.info("[INFO] RAG pipeline ready")
 
 

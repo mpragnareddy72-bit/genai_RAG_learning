@@ -5,8 +5,10 @@ try:
 except ImportError:
     from vectorstores import QdrantVectorStore
 
-
-from rrf import ReciprocalRankFusion
+try:
+    from .rrf import ReciprocalRankFusion
+except ImportError:
+    from rrf import ReciprocalRankFusion
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +24,7 @@ class BM25Search:
 
         # Extract text from every chunk
         self.texts = [
-            doc["metadata"].get("text", "")
+            doc.get("metadata", {}).get("text", "")
             for doc in documents
         ]
 
@@ -40,7 +42,7 @@ class BM25Search:
             len(self.documents)
         )
 
-    def search(self, query, top_k=5):
+    def search(self, query: str, top_k: int = 5):
         """
         Search documents using BM25 keyword matching.
         """
@@ -60,117 +62,107 @@ class BM25Search:
 
         results = []
 
+        print("\n===== BM25 SEARCH =====")
+
+        for r in results:
+            print(r["metadata"].get("text", ""))
+
         for index in ranked_indices:
+            document = self.documents[index]
             results.append({
                 "score": float(scores[index]),
-                "metadata": self.documents[index]["metadata"]
+                "metadata": document.get("metadata", {})
             })
 
         return results
 
-if __name__ == "__main__":
-    logger.info("[INFO] Starting BM25 + semantic search test")
+class HybridSearch:
 
-    vectorstore = QdrantVectorStore(
-        collection_name="documents",
-        persist_dir="qdrant_store",
-        embedding_model="nomic-embed-text",
-    )
+    def __init__(self, vectorstore):
 
-    # Get all chunks from Qdrant
-    documents = vectorstore.get_all_documents()
+        self.vectorstore = vectorstore
 
-    print(f"Total documents/chunks: {len(documents)}")
+        # Get all documents from Qdrant
+        documents = vectorstore.get_all_documents()
 
-    # Create BM25 index
-    bm25_search = BM25Search(documents)
-    # --------------------------------------------------
-    # Hybrid search using RRF
-    # --------------------------------------------------
+        
 
-    query = "What is population of afganistan"
+        # Create BM25 index
+        self.bm25_search = BM25Search(documents)
 
-    # Semantic search
-    nomic_results = vectorstore.query(
-        query,
-        top_k=10
-    )
+        # --------------------------------------------------
+        # Hybrid search using RRF
+        # --------------------------------------------------
 
-    # Keyword search
-    bm25_results = bm25_search.search(
-        query,
-        top_k=10
-    )
+        self.rrf = ReciprocalRankFusion(k=60)
 
-    # RRF
-    rrf = ReciprocalRankFusion(k=60)
+        logger.info(
+            "HybridSearch initialized | documents=%d",
+            len(documents)
+        )
+       
 
-    rrf_results = rrf.fuse(
-        [nomic_results, bm25_results],
-        top_k=5
-    )
+    def search(
+        self,
+        query: str,
+        semantic_top_k: int = 10,
+        bm25_top_k: int = 10,
+        final_top_k: int = 10,
+    ):
 
-    print(f"\nRRF Hybrid results for: {query}\n")
+        logger.info(
+            "Hybrid search started | query=%s",
+            query
+        )
 
-    for i, result in enumerate(rrf_results, start=1):
+        logger.info(
+            "Hybrid search started | query=%s",
+            query
+        )
 
-        print(f"Result {i}")
-        print(f"RRF Score: {result['score']}")
+        # --------------------------------
+        # 1. Nomic semantic search
+        # --------------------------------
 
-        text = result["metadata"].get("text", "")
+        semantic_results = self.vectorstore.query(
+            query,
+            top_k=semantic_top_k
+        )
 
-        if "afghanistan" in text.lower():
-            print("AFGHANISTAN CHUNK")
+        logger.info(
+            "Nomic results=%d",
+            len(semantic_results)
+        )
 
-        print(text[:500])
-        print("-" * 80)
+        # --------------------------------
+        # 2. BM25 keyword search
+        # --------------------------------
 
-    '''query = "What is population of afganistan"
+        bm25_results = self.bm25_search.search(
+            query,
+            top_k=bm25_top_k
+        )
 
-    # --------------------------------------------------
-    # Check whether Afghanistan exists in Qdrant
-    # --------------------------------------------------
+        logger.info(
+            "BM25 results=%d",
+            len(bm25_results)
+        )
 
-    print("\nSearching Qdrant documents for Afghanistan...\n")
+        # --------------------------------
+        # 3. RRF
+        # --------------------------------
 
-    for doc in documents:
-        text = doc["metadata"].get("text", "")
+        rrf_results = self.rrf.fuse(
+            [
+                semantic_results,
+                bm25_results
+            ],
+            top_k=final_top_k
+        )
 
-        if "afghanistan" in text.lower():
-            print("FOUND AFGHANISTAN CHUNK:")
-            print(text[:1000])
-            print("-" * 80)
+        logger.info(
+            "Hybrid search completed | results=%d",
+            len(rrf_results)
+        )
 
-    # --------------------------------------------------
-    # Nomic / Qdrant semantic search
-    # --------------------------------------------------
-
-    print(f"\nNomic/Qdrant results for: {query}\n")
-
-    results = vectorstore.query(
-        query,
-        top_k=5
-    )
-
-    for i, result in enumerate(results, start=1):
-        print(f"\nResult {i}")
-        print(f"Score: {result['score']}")
-        print(result["metadata"].get("text", "")[:500])
-        print("-" * 80)
-
-    # --------------------------------------------------
-    # BM25 keyword search
-    # --------------------------------------------------
-
-    results = bm25_search.search(
-        query,
-        top_k=5
-    )
-
-    print(f"\nBM25 results for: {query}\n")
-
-    for i, result in enumerate(results, start=1):
-        print(f"Result {i}")
-        print(f"Score: {result['score']}")
-        print(f"Text: {result['metadata'].get('text', '')[:500]}")
-        print("-" * 80)'''
+        return rrf_results
