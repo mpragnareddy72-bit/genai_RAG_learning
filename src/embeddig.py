@@ -34,7 +34,7 @@ langfuse = get_client()
 
 
 class EmbeddingPipeline:
-    def __init__(self, model_name: str = "nomic-embed-text", chunk_size: int = 1000, chunk_overlap: int = 200): # model_name: str = "all-MiniLM-L6-v2"
+    def __init__(self, model_name: str = "nomic-embed-text", chunk_size: int = 500, chunk_overlap: int = 50): # model_name: str = "all-MiniLM-L6-v2"
         self.model_name = model_name
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap

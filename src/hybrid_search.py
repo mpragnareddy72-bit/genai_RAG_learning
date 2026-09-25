@@ -34,8 +34,13 @@ class BM25Search:
             for text in self.texts
         ]
 
-        # Build BM25 index
-        self.bm25 = BM25Okapi(tokenized_documents)
+        # Build BM25 index(skip if there's nothing to index yet)
+        if tokenized_documents:
+            self.bm25 = BM25Okapi(tokenized_documents)
+        else:
+            self.bm25 = None
+            logger.warning("[WARN] No documents found — BM25 index not built")
+
 
         logger.info(
             "[INFO] BM25 index created | documents=%d",
@@ -46,6 +51,9 @@ class BM25Search:
         """
         Search documents using BM25 keyword matching.
         """
+
+        if self.bm25 is None:
+            return []
 
         # Tokenize query
         tokenized_query = query.lower().split()

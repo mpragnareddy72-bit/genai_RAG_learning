@@ -1,6 +1,6 @@
 import { useState } from "react";
-import ChatMessage from "./components/ChatMessage";
-import ChatInput from "./components/ChatInput";
+import ChatMessage from "./components/chatmessage";
+import ChatInput from "./components/chatinput";
 import { askQuestion } from "./services/api";
 import "./App.css";
 

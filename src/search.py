@@ -1,4 +1,5 @@
 import logging
+import os
 
 from langchain_ollama import ChatOllama
 
@@ -65,6 +66,7 @@ class RAGSearch:
         self.llm = ChatOllama(
             model=llm_model,
             temperature=0.1,
+            base_url=os.environ.get("OLLAMA_HOST", "http://localhost:11434")
         )
 
         logger.info(
@@ -87,9 +89,9 @@ class RAGSearch:
 
         hybrid_results = self.hybrid_search.search(
             query=query,
-            semantic_top_k=10,
-            bm25_top_k=10,
-            final_top_k=10,
+            semantic_top_k=5,
+            bm25_top_k=5,
+            final_top_k=5,
         )
 
         logger.info(
@@ -135,12 +137,19 @@ class RAGSearch:
         )
 
         prompt = f"""
-    You are a helpful question-answering assistant.
+You are a question-answering assistant for a Retrieval-Augmented Generation (RAG) system.
 
-    Answer the user's question using ONLY the provided context.
+Your task is to answer the user's question using ONLY the information provided in the context.
 
-    If the answer cannot be found in the context,
-    say that the information is not available in the documents.
+Rules:
+1. Use only the provided context.
+2. Do not use your own knowledge or make assumptions.
+3. If the context contains the answer, answer the question directly and clearly.
+4. If the context does not contain enough information to answer the question, say:
+   "The information is not available in the documents."
+5. Do not invent, guess, or infer missing facts.
+6. For factual questions, preserve the values exactly as they appear in the context.
+
 
     Context:
     {context}

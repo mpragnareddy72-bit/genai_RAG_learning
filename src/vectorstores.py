@@ -9,6 +9,7 @@ from qdrant_client.http import models as qmodels
 #from sentence_transformers import SentenceTransformer
 from langchain_ollama import OllamaEmbeddings
 
+
 from langfuse import observe, get_client
 
 try:
@@ -50,8 +51,8 @@ class QdrantVectorStore:
         collection_name: str = "documents",
         persist_dir: str = "qdrant_store",
         embedding_model: str = "nomic-embed-text",
-        chunk_size: int = 1000,
-        chunk_overlap: int = 200,
+        chunk_size: int = 500,
+        chunk_overlap: int = 50,
         url: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
@@ -61,7 +62,7 @@ class QdrantVectorStore:
         self.chunk_overlap = chunk_overlap
 
         logger.info("Loading embedding model: %s", embedding_model)
-        self.model = OllamaEmbeddings(model=embedding_model)
+        self.model = OllamaEmbeddings(model=embedding_model,base_url=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
         #self.embedding_dim = self.model.get_embedding_dimension()
         # Get embedding dimension from the actual model
         test_embedding = self.model.embed_query("test")
@@ -139,9 +140,63 @@ class QdrantVectorStore:
             chunk_overlap=self.chunk_overlap,
         )
 
-        chunks = emb_pipe.chunk_documents(documents)
-        logger.info("[INFO] Chunking completed | Total chunks: %d", len(chunks))
+        #chunks = emb_pipe.chunk_documents(documents)
+        #logger.info("[INFO] Chunking completed | Total chunks: %d", len(chunks))
+        # --------------------------------------------------
+        # Separate JSON documents from normal documents
+        # --------------------------------------------------
 
+        json_documents = []
+        normal_documents = []
+
+        for document in documents:
+            file_type = document.metadata.get("file_type")
+
+            if file_type == "json":
+                json_documents.append(document)
+            else:
+                normal_documents.append(document)
+
+        logger.info(
+            "[INFO] Document split | JSON records: %d | Normal documents: %d",
+            len(json_documents),
+            len(normal_documents),
+        )
+
+        # --------------------------------------------------
+        # Chunk normal documents
+        # --------------------------------------------------
+
+        chunks = []
+
+        if normal_documents:
+            normal_chunks = emb_pipe.chunk_documents(normal_documents)
+            chunks.extend(normal_chunks)
+
+            logger.info(
+                "[INFO] Normal document chunking completed | chunks=%d",
+                len(normal_chunks),
+            )
+
+        # --------------------------------------------------
+        # JSON documents are already individual records
+        # Do NOT character-split them
+        # --------------------------------------------------
+
+        if json_documents:
+            chunks.extend(json_documents)
+
+            logger.info(
+                "[INFO] JSON records kept intact | records=%d",
+                len(json_documents),
+            )
+
+        logger.info(
+            "[INFO] Final documents/chunks ready for embedding | total=%d",
+            len(chunks),
+        )
+
+        #duplication
         existing_ids = self.get_existing_chunk_ids()
         new_chunks = [c for c in chunks if c.metadata.get("chunk_id") not in existing_ids]
         skipped = len(chunks) - len(new_chunks)

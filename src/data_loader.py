@@ -4,6 +4,8 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader, CSVLoa
 from langchain_community.document_loaders import Docx2txtLoader
 from langchain_community.document_loaders.excel import UnstructuredExcelLoader
 from langchain_community.document_loaders import JSONLoader
+#import json
+#from langchain_core.documents import Document
 
 from typing import List, Any
 import logging
@@ -37,6 +39,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------
 
 langfuse = get_client()
+
+
 
 
 # ---------------------------------------------------------
